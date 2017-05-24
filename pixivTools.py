@@ -4,6 +4,7 @@ Created on Fri May 19 15:15:23 2017
 
 @author: alphaXdream
 
+1000users入り
 Test url:https://www.pixiv.net/search.php?s_mode=s_tag_full&word=%E3%83%A6%E3%82%B0%E3%83%89%E3%83%A9%E3%82%B7%E3%83%AB(%E3%82%B0%E3%83%A9%E3%83%96%E3%83%AB)
 
 """
@@ -12,6 +13,7 @@ import requests
 import re
 import time
 import random
+import os
 from bs4 import BeautifulSoup
 user_agent_list = [
             "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1",
@@ -65,56 +67,92 @@ def login():
 def getHTMLText(url):
     return s.get(url).text
 
+def saveRankPic(url):
+    count = -1# &p=2
+    p = 1
+    infos = []
+    while count!=0:
+        text = getHTMLText(url+'&p='+str(p))
+        p = p+1
+        soup = BeautifulSoup(text,"lxml")
+        if count==-1:
+            count = int(soup.find('span',{'class':'count-badge'}).get_text()[:-1])
+        for item in soup.find_all('li',{'class':'image-item'}):
+            count = count - 1
+            img_link = website+item.a['href']
+            title = item.find('h1',{'class':'title'}).get_text()
+            author = item.find('a',{'class':'user ui-profile-popup'}).get_text()
+            if item.find('a',{'class':'bookmark-count _ui-tooltip'}) is not None:
+                star = int(item.find('a',{'class':'bookmark-count _ui-tooltip'}).get_text())
+            else:
+                star = 0
+            infos.append((star,author,title,img_link)) #按照收藏数、作者、标题、图片链接的顺序存放
+            
+            '''
+            print('图片链接：'+website+item.a['href'])
+            print('标题：'+item.find('h1',{'class':'title'}).get_text())
+            print('作者：'+item.find('a',{'class':'user ui-profile-popup'}).get_text())
+            print('收藏数：'+item.find('a',{'class':'bookmark-count _ui-tooltip'}).get_text())
+            t = item.find('img',{'class':'_thumbnail ui-scroll-view '})['data-src']
+            t = re.sub(r'c/150x150/img-master','img-original',t)
+            t = re.sub(r'_master1200','',t)
+            print('正在下载：'+t)
+            try:
+                tmp = headers
+                tmp['Referer'] = t
+                pic= s.get(t,headers=tmp)
+            except requests.exceptions.ConnectionError:
+                print('当前图片无法下载')
+                continue
+            file = open('pic2/'+t.split(r'/')[-1],'wb')
+            file.write(pic.content)
+            file.close()
+            time.sleep(5)'''
+    infos.sort(reverse=True)
+    file = open('rank.txt','w',encoding='utf-8')#收藏数、作者、标题、图片链接
+    for item in infos:
+        file.write('收藏数:'+str(item[0])+'\n')
+        file.write('作者:'+item[1]+'\n')
+        file.write('标题:'+item[2]+'\n')
+        file.write('图片链接:'+item[3])
+        file.write('\n'*3)
+    file.close()
+
+def downloadPicByAuthor(url):
+    count = -1# &p=2
+    p = 1
+    infos = []
+    while count!=0:
+        text = getHTMLText(url+'&p='+str(p))
+        p = p+1
+        soup = BeautifulSoup(text,"lxml")
+        #user
+        author = soup.find('h1',{'class':'user'}).get_text()
+        if count==-1:
+            count = int(soup.find('span',{'class':'count-badge'}).get_text()[:-1])
+        for item in soup.find_all('li',{'class':'image-item'}):
+            count = count - 1
+            img_link = website+item.a['href']
+            t = item.find('img',{'class':'_thumbnail ui-scroll-view '})['data-src']
+            t = re.sub(r'c/150x150/img-master','img-original',t)
+            t = re.sub(r'_master1200','',t)
+            try:
+                tmp = headers
+                tmp['Referer'] = img_link
+                pic= s.get(t,headers=tmp)
+            except requests.exceptions.ConnectionError:
+                print('当前图片无法下载')
+                continue
+            if not os.path.exists(author):
+                os.mkdir(author)
+            file = open(author+'/'+t.split(r'/')[-1],'wb')
+            file.write(pic.content)
+            file.close()
+            time.sleep(5)
 s = requests.Session()
 login()
 website = 'https://www.pixiv.net'
 url = "https://www.pixiv.net/search.php?s_mode=s_tag_full&word=%E3%83%A6%E3%82%B0%E3%83%89%E3%83%A9%E3%82%B7%E3%83%AB(%E3%82%B0%E3%83%A9%E3%83%96%E3%83%AB)"
-count = -1# &p=2
-p = 1
-infos = []
-while count!=0:
-    text = getHTMLText(url+'&p='+str(p))
-    p = p+1
-    soup = BeautifulSoup(text,"lxml")
-    if count==-1:
-        count = int(soup.find('span',{'class':'count-badge'}).get_text()[:-1])
-    for item in soup.find_all('li',{'class':'image-item'}):
-        count = count - 1
-        img_link = website+item.a['href']
-        title = item.find('h1',{'class':'title'}).get_text()
-        author = item.find('a',{'class':'user ui-profile-popup'}).get_text()
-        if item.find('a',{'class':'bookmark-count _ui-tooltip'}) is not None:
-            star = int(item.find('a',{'class':'bookmark-count _ui-tooltip'}).get_text())
-        else:
-            star = 0
-        infos.append((star,author,title,img_link)) #按照收藏数、作者、标题、图片链接的顺序存放
-        
-        '''
-        print('图片链接：'+website+item.a['href'])
-        print('标题：'+item.find('h1',{'class':'title'}).get_text())
-        print('作者：'+item.find('a',{'class':'user ui-profile-popup'}).get_text())
-        print('收藏数：'+item.find('a',{'class':'bookmark-count _ui-tooltip'}).get_text())
-        t = item.find('img',{'class':'_thumbnail ui-scroll-view '})['data-src']
-        t = re.sub(r'c/150x150/img-master','img-original',t)
-        t = re.sub(r'_master1200','',t)
-        print('正在下载：'+t)
-        try:
-            tmp = headers
-            tmp['Referer'] = t
-            pic= s.get(t,headers=tmp)
-        except requests.exceptions.ConnectionError:
-            print('当前图片无法下载')
-            continue
-        file = open('pic2/'+t.split(r'/')[-1],'wb')
-        file.write(pic.content)
-        file.close()
-        time.sleep(5)'''
-infos.sort(reverse=True)
-file = open('rank.txt','w',encoding='utf-8')#收藏数、作者、标题、图片链接
-for item in infos:
-    file.write('收藏数:'+str(item[0])+'\n')
-    file.write('作者:'+item[1]+'\n')
-    file.write('标题:'+item[2]+'\n')
-    file.write('图片链接:'+item[3])
-    file.write('\n'*3)
-file.close()
+saveRankPic(url)
+author_url = 'https://www.pixiv.net/member_illust.php?id=1055457'
+downloadPicByAuthor(author_url)
